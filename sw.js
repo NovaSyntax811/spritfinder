@@ -1,5 +1,5 @@
 // Nur die App-Hülle wird gecacht. Preise kommen immer frisch aus dem Netz.
-const CACHE = "spritfinder-v1";
+const CACHE = "spritfinder-v2";
 const SHELL = ["./", "index.html", "config.js", "manifest.webmanifest", "icon.svg"];
 
 self.addEventListener("install", (e) => {

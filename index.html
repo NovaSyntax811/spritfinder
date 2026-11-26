@@ -183,6 +183,7 @@
   };
 
   const apiKey = () => (store.get("key", "") || window.SPRITFINDER_KEY || "").trim();
+  const proxyUrl = () => (window.SPRITFINDER_PROXY || "").trim();
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   // Nur reine Großschreibung glätten (ARAL wird Aral), gemischte Schreibweisen wie TotalEnergies bleiben.
   const titleCase = (s) => /[a-zäöüß]/.test(String(s ?? "")) ? String(s) : String(s ?? "").toLowerCase().replace(/(^|[\s\-\/.(])([a-zäöü])/g, (m, a, b) => a + b.toUpperCase());
@@ -226,6 +227,9 @@
   /* ---------- Daten ---------- */
 
   async function fetchStations(pos) {
+    state.sourceAt = 0;
+    // Ohne eigenen Schlüssel: über den Zwischenserver, der den Schlüssel geheim hält.
+    if (!apiKey() && proxyUrl()) return fetchProxy(pos);
     if (apiKey()) {
       try {
         const list = await fetchWith(pos, apiKey());
@@ -238,6 +242,22 @@
       }
     }
     return fetchWith(pos, DEMO_KEY);
+  }
+
+  async function fetchProxy(pos) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    try {
+      const res = await fetch(`${proxyUrl()}?lat=${pos.lat.toFixed(5)}&lng=${pos.lng.toFixed(5)}`, { signal: ctrl.signal, cache: "no-store" });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.message || "Die Preisquelle hat einen Fehler gemeldet");
+      state.sourceAt = json.fetchedAt || 0;
+      // Der Server rundet den Standort für seinen Zwischenspeicher. Entfernungen deshalb hier genau neu berechnen.
+      return (json.stations || [])
+        .map((s) => ({ ...s, dist: Math.round(distKm(pos, s) * 10) / 10 }))
+        .filter((s) => s.dist <= STEPS.at(-1))
+        .sort((a, b) => a.dist - b.dist);
+    } finally { clearTimeout(timer); }
   }
 
   async function fetchWith(pos, key) {
@@ -269,7 +289,7 @@
       if (!state.stations) showState(`<div class="pulse"></div><h2>Preise werden geladen</h2>`);
       try {
         state.stations = await fetchStations(pos);
-        state.fetchedAt = Date.now();
+        state.fetchedAt = state.sourceAt || Date.now();
         state.stale = false;
         state.pos = pos;
         store.set("last", { stations: state.stations, fetchedAt: state.fetchedAt, pos });
@@ -374,7 +394,7 @@
   function renderBanner() {
     const parts = [];
     if (state.keyError) parts.push(`<div class="banner">Tankerkönig nimmt deinen Schlüssel nicht an („${esc(state.keyError)}“). Die Preise sind deshalb Beispielwerte. Neue Schlüssel müssen meist erst über den Link in der Bestätigungsmail freigeschaltet werden. <button data-act="key">Schlüssel prüfen</button></div>`);
-    else if (!apiKey()) parts.push(`<div class="banner">Demo Modus: Die Preise sind Beispielwerte. <button data-act="key">Kostenlosen Schlüssel eintragen</button> für echte Preise.</div>`);
+    else if (!apiKey() && !proxyUrl()) parts.push(`<div class="banner">Demo Modus: Die Preise sind Beispielwerte. <button data-act="key">Kostenlosen Schlüssel eintragen</button> für echte Preise.</div>`);
     if (state.stale) parts.push(`<div class="banner">Kein Netz. Du siehst die Preise von ${clock(state.fetchedAt)} Uhr, sie können inzwischen abweichen.</div>`);
     $("banner").innerHTML = parts.join("");
   }

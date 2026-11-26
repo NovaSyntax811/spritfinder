@@ -11,7 +11,9 @@ App öffnen, offene Tankstelle mit aktuellem Preis antippen, in Google Maps losf
 
 ## Einrichtung
 
-Für echte Preise braucht die App einen kostenlosen Schlüssel von [Tankerkönig](https://creativecommons.tankerkoenig.de). Er wird in der App unter „API Schlüssel“ eingetragen und bleibt nur auf dem Gerät. Ohne Schlüssel zeigt die App Beispielpreise.
+Die Preise kommen über einen kleinen Cloudflare Worker (Ordner `proxy`). Er hält den [Tankerkönig](https://creativecommons.tankerkoenig.de) Schlüssel als Secret `TK_KEY` geheim und speichert Antworten fünf Minuten zwischen. Seine Adresse steht in `config.js`.
+
+Alternativ lässt sich in der App unter „API Schlüssel“ ein eigener Schlüssel eintragen. Er bleibt nur auf dem Gerät, und die App fragt dann direkt bei Tankerkönig.
 
 ## Daten
 
