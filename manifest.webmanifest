@@ -1,0 +1,16 @@
+{
+  "name": "Spritfinder",
+  "short_name": "Spritfinder",
+  "description": "Offene Tankstellen in der Nähe mit aktuellem Preis. Ein Tipp und Google Maps navigiert hin.",
+  "lang": "de",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e1114",
+  "theme_color": "#0e1114",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

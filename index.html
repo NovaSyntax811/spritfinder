@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spritfinder</title>
+<meta name="description" content="Offene Tankstellen in der Nähe mit aktuellem Preis. Ein Tipp und Google Maps navigiert hin.">
+<meta name="theme-color" content="#0e1114">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-512.png">
+<style>
+  :root {
+    --bg: #0e1114; --card: #181d22; --line: #262d34; --text: #f2f5f7; --muted: #94a0ab;
+    --accent: #3ddc84; --accent-ink: #06240f; --warn: #ffc857; --bad: #ff7b72;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f3f5f7; --card: #ffffff; --line: #dfe4e9; --text: #12171c; --muted: #5d6974;
+      --accent: #0c8f45; --accent-ink: #ffffff; --warn: #8a5a00; --bad: #b3261e;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 0 16px 32px; }
+  header {
+    position: sticky; top: 0; z-index: 2; background: var(--bg);
+    max-width: 560px; margin: 0 auto; padding: 12px 16px 10px;
+  }
+  .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .icon-btn {
+    width: 48px; height: 48px; border-radius: 14px; border: 1px solid var(--line);
+    background: var(--card); display: grid; place-items: center;
+  }
+  .icon-btn svg { width: 22px; height: 22px; }
+  .icon-btn.spin svg { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .seg {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 4px;
+  }
+  .seg + .seg { margin-top: 8px; }
+  .seg button {
+    border: 0; background: transparent; min-height: 44px; border-radius: 10px;
+    font-weight: 600; color: var(--muted);
+  }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .info { color: var(--muted); font-size: 14px; margin: 12px 2px; }
+  .info strong { color: var(--text); font-weight: 600; }
+  .banner {
+    border: 1px solid var(--warn); color: var(--warn); border-radius: 14px;
+    padding: 10px 12px; font-size: 14px; margin: 12px 0 0;
+  }
+  .banner button, .link {
+    background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; font-weight: 600;
+  }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  a.station {
+    display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center;
+    min-height: 84px; padding: 14px 16px; border-radius: 16px;
+    background: var(--card); border: 1px solid var(--line); color: inherit; text-decoration: none;
+  }
+  a.station:active { transform: scale(0.985); }
+  a.station.best { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  a.station.closed { opacity: 0.6; }
+  .name { font-weight: 700; font-size: 17px; overflow-wrap: anywhere; }
+  .addr { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: 13px; }
+  .chip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px; color: var(--muted); }
+  .chip.best { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .chip.closed { color: var(--bad); border-color: var(--bad); }
+  .right { text-align: right; white-space: nowrap; }
+  .price { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .price sup { font-size: 0.5em; vertical-align: top; position: relative; top: 0.25em; margin-left: 1px; }
+  .delta { color: var(--muted); font-size: 13px; }
+  .go { color: var(--accent); font-size: 13px; font-weight: 700; }
+  .state { text-align: center; padding: 56px 12px; color: var(--muted); }
+  .state h2 { color: var(--text); font-size: 19px; margin: 0 0 8px; }
+  .state .primary, dialog .primary {
+    margin-top: 16px; min-height: 48px; padding: 0 22px; border-radius: 14px; border: 0;
+    background: var(--accent); color: var(--accent-ink); font-weight: 700;
+  }
+  .pulse {
+    width: 56px; height: 56px; margin: 0 auto 18px; border-radius: 50%;
+    border: 4px solid var(--line); border-top-color: var(--accent); animation: spin 0.9s linear infinite;
+  }
+  form.place { display: flex; gap: 8px; margin-top: 18px; }
+  input[type="text"] {
+    flex: 1; min-width: 0; min-height: 48px; border-radius: 14px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font: inherit; padding: 0 14px;
+  }
+  form.place button { min-height: 48px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); font-weight: 600; }
+  footer { color: var(--muted); font-size: 12.5px; text-align: center; margin-top: 22px; }
+  footer a { color: inherit; }
+  footer p { margin: 6px 0; }
+  dialog {
+    border: 1px solid var(--line); border-radius: 18px; background: var(--card); color: var(--text);
+    width: min(92vw, 440px); padding: 20px;
+  }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+  dialog h2 { margin: 0 0 8px; font-size: 18px; }
+  dialog p { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  dialog a { color: var(--accent); }
+  dialog input { width: 100%; }
+  dialog .row { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+  dialog .ghost { margin-top: 16px; min-height: 48px; padding: 0 16px; border-radius: 14px; border: 1px solid var(--line); background: transparent; }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: 0s !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>Spritfinder</h1>
+    <button class="icon-btn" id="refresh" aria-label="Neu suchen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+    </button>
+  </div>
+  <div class="seg" id="fuel" role="group" aria-label="Kraftstoff">
+    <button data-v="e5">Super E5</button>
+    <button data-v="e10">Super E10</button>
+    <button data-v="diesel">Diesel</button>
+  </div>
+  <div class="seg" id="sort" role="group" aria-label="Sortierung">
+    <button data-v="dist">Nächste zuerst</button>
+    <button data-v="price">Günstigste zuerst</button>
+  </div>
+</header>
+
+<main>
+  <div id="banner"></div>
+  <p class="info" id="info" aria-live="polite"></p>
+  <div id="view"></div>
+  <footer>
+    <p id="hidden"></p>
+    <p>Preisdaten: <a href="https://www.tankerkoenig.de" target="_blank" rel="noopener">Tankerkönig</a> (MTS-K, CC BY 4.0). Entfernung als Luftlinie.</p>
+    <p>Keine Werbung, kein Konto, kein Tracking. <button class="link" id="keyBtn">API Schlüssel</button></p>
+  </footer>
+</main>
+
+<dialog id="keyDlg">
+  <form method="dialog" id="keyForm">
+    <h2>Tankerkönig Schlüssel</h2>
+    <p>Für echte Preise braucht die App einmalig einen kostenlosen Schlüssel von <a href="https://creativecommons.tankerkoenig.de" target="_blank" rel="noopener">creativecommons.tankerkoenig.de</a>. Er bleibt nur auf diesem Gerät gespeichert.</p>
+    <input type="text" id="keyInput" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <div class="row">
+      <button class="ghost" value="cancel" type="submit">Abbrechen</button>
+      <button class="primary" value="save" type="submit">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="config.js"></script>
+<script>
+(() => {
+  const DEMO_KEY = "00000000-0000-0000-0000-000000000002";
+  const API = "https://creativecommons.tankerkoenig.de/json/list.php";
+  const STEPS = [5, 10, 15, 25];           // Umkreis in km, wird automatisch erweitert
+  const FUEL_LABEL = { e5: "Super E5", e10: "Super E10", diesel: "Diesel" };
+  const $ = (id) => document.getElementById(id);
+
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("sf:" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("sf:" + k, JSON.stringify(v)); } catch {} },
+  };
+
+  const state = {
+    fuel: store.get("fuel", "e5"),
+    sort: store.get("sort", "dist"),
+    showClosed: false,
+    stations: null,
+    fetchedAt: 0,
+    pos: null,
+    stale: false,
+    keyError: "",
+  };
+
+  const apiKey = () => (store.get("key", "") || window.SPRITFINDER_KEY || "").trim();
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  // Nur reine Großschreibung glätten (ARAL wird Aral), gemischte Schreibweisen wie TotalEnergies bleiben.
+  const titleCase = (s) => /[a-zäöüß]/.test(String(s ?? "")) ? String(s) : String(s ?? "").toLowerCase().replace(/(^|[\s\-\/.(])([a-zäöü])/g, (m, a, b) => a + b.toUpperCase());
+  const km = (d) => d.toFixed(1).replace(".", ",") + " km";
+  const clock = (t) => new Date(t).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+
+  function priceHtml(p) {
+    const s = p.toFixed(3);                 // 1.739 wird zu 1,73 mit hochgestellter 9
+    return `${s.slice(0, -1).replace(".", ",")}<sup>${s.slice(-1)}</sup>`;
+  }
+
+  function distKm(a, b) {
+    const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(h));
+  }
+
+  /* ---------- Standort ---------- */
+
+  function locate() {
+    const q = new URLSearchParams(location.search);
+    if (q.has("lat") && q.has("lng")) return Promise.resolve({ lat: +q.get("lat"), lng: +q.get("lng") });
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject({ code: 0 });
+      navigator.geolocation.getCurrentPosition(
+        (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        reject,
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+      );
+    });
+  }
+
+  async function geocode(text) {
+    const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=de&q=" + encodeURIComponent(text);
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const hit = (await res.json())[0];
+    if (!hit) throw new Error("Ort nicht gefunden");
+    return { lat: +hit.lat, lng: +hit.lon };
+  }
+
+  /* ---------- Daten ---------- */
+
+  async function fetchStations(pos) {
+    if (apiKey()) {
+      try {
+        const list = await fetchWith(pos, apiKey());
+        state.keyError = "";
+        return list;
+      } catch (err) {
+        // Ungültiger oder noch nicht freigeschalteter Schlüssel: mit Beispielpreisen weiterlaufen statt stehen bleiben.
+        if (!/key/i.test(err.message)) throw err;
+        state.keyError = err.message;
+      }
+    }
+    return fetchWith(pos, DEMO_KEY);
+  }
+
+  async function fetchWith(pos, key) {
+    // Ein einziger Abruf mit dem größten Umkreis. Das Erweitern passiert danach lokal und ohne Wartezeit.
+    const url = `${API}?lat=${pos.lat}&lng=${pos.lng}&rad=${STEPS.at(-1)}&sort=dist&type=all&apikey=${key}`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15000);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.message || "Die Preisquelle hat einen Fehler gemeldet");
+      return json.stations || [];
+    } finally { clearTimeout(timer); }
+  }
+
+  async function run(manualPos) {
+    $("refresh").classList.add("spin");
+    if (!state.stations) showState(`<div class="pulse"></div><h2>Standort wird gesucht</h2><p>Gleich siehst du die offenen Tankstellen um dich herum.</p>`);
+    let pos;
+    try {
+      pos = manualPos || await locate();
+    } catch (err) {
+      $("refresh").classList.remove("spin");
+      return showLocationError(err);
+    }
+    // Kurz hintereinander am selben Ort: vorhandene Daten zeigen statt die Preisquelle erneut zu belasten.
+    const fresh = state.stations && !state.stale && Date.now() - state.fetchedAt < 60000 && state.pos && distKm(state.pos, pos) < 0.3;
+    if (!fresh) {
+      if (!state.stations) showState(`<div class="pulse"></div><h2>Preise werden geladen</h2>`);
+      try {
+        state.stations = await fetchStations(pos);
+        state.fetchedAt = Date.now();
+        state.stale = false;
+        state.pos = pos;
+        store.set("last", { stations: state.stations, fetchedAt: state.fetchedAt, pos });
+      } catch (err) {
+        const last = store.get("last", null);
+        if (last && distKm(last.pos, pos) < 3) {
+          Object.assign(state, last, { stale: true });
+        } else {
+          $("refresh").classList.remove("spin");
+          $("info").textContent = "";
+          return showState(`<h2>Keine Verbindung zur Preisquelle</h2><p>${esc(err.name === "AbortError" ? "Die Anfrage hat zu lange gedauert." : err.message)}</p><button class="primary" data-act="retry">Erneut versuchen</button>`);
+        }
+      }
+    }
+    $("refresh").classList.remove("spin");
+    render();
+  }
+
+  /* ---------- Anzeige ---------- */
+
+  function showState(html) { $("view").innerHTML = `<div class="state">${html}</div>`; }
+
+  function showLocationError(err) {
+    const denied = err && err.code === 1;
+    $("info").textContent = "";
+    showState(`
+      <h2>${denied ? "Standort ist nicht freigegeben" : "Standort nicht gefunden"}</h2>
+      <p>${denied
+        ? "Erlaube den Standortzugriff in den Einstellungen deines Browsers oder gib kurz einen Ort ein."
+        : "Das GPS Signal reicht gerade nicht. Versuch es noch einmal oder gib kurz einen Ort ein."}</p>
+      <button class="primary" data-act="retry">Erneut versuchen</button>
+      <form class="place" id="placeForm">
+        <input type="text" id="placeInput" placeholder="PLZ oder Ort" inputmode="text" autocomplete="postal-code" aria-label="PLZ oder Ort">
+        <button type="submit">Suchen</button>
+      </form>`);
+  }
+
+  function render() {
+    const { fuel, sort } = state;
+    const priced = state.stations.filter((s) => typeof s[fuel] === "number" && s[fuel] > 0);
+    const open = priced.filter((s) => s.isOpen);
+    const pool = state.showClosed ? priced : open;
+
+    const radius = STEPS.find((r) => pool.some((s) => s.dist <= r));
+    const list = radius ? pool.filter((s) => s.dist <= radius) : [];
+    list.sort((a, b) => sort === "price" ? (a[fuel] - b[fuel]) || (a.dist - b.dist) : (a.dist - b.dist) || (a[fuel] - b[fuel]));
+
+    renderBanner();
+
+    if (!list.length) {
+      $("info").textContent = "";
+      const closedNear = priced.length - open.length;
+      showState(`<h2>Keine offene Tankstelle im Umkreis von ${STEPS.at(-1)} km</h2>
+        <p>Für ${FUEL_LABEL[fuel]} meldet gerade keine geöffnete Station einen Preis.</p>
+        ${closedNear && !state.showClosed ? `<button class="primary" data-act="closed">${closedNear} geschlossene anzeigen</button>` : ""}`);
+      $("hidden").textContent = "";
+      return;
+    }
+
+    const openInList = list.filter((s) => s.isOpen);
+    const ref = openInList.length ? openInList : list;
+    const min = Math.min(...ref.map((s) => s[fuel]));
+    const bestId = ref.filter((s) => s[fuel] === min).sort((a, b) => a.dist - b.dist)[0].id;
+
+    const count = `<strong>${list.length} ${state.showClosed ? "" : "offene "}${list.length === 1 ? "Tankstelle" : "Tankstellen"}</strong>`;
+    $("info").innerHTML = (radius === STEPS[0]
+      ? `${count} im Umkreis von ${radius} km.`
+      : `Im Umkreis von ${STEPS[0]} km ist nichts offen. Suche auf ${radius} km erweitert: ${count}.`)
+      + ` Stand ${clock(state.fetchedAt)} Uhr.`;
+
+    $("view").innerHTML = "<ul>" + list.map((s) => {
+      const best = s.id === bestId;
+      const diff = Math.round((s[fuel] - min) * 100);
+      const title = titleCase(s.brand || s.name);
+      const addr = `${titleCase(s.street)} ${esc(s.houseNumber || "")}, ${titleCase(s.place)}`.replace(/\s+,/, ",");
+      const nav = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=driving&dir_action=navigate`;
+      return `<li><a class="station${best ? " best" : ""}${s.isOpen ? "" : " closed"}" href="${nav}" target="_blank" rel="noopener"
+          aria-label="Navigation zu ${esc(title)}, ${esc(addr)} starten. ${FUEL_LABEL[fuel]} ${s[fuel].toFixed(3).replace(".", ",")} Euro, ${km(s.dist)} entfernt.">
+        <div>
+          <div class="name">${esc(title)}</div>
+          <div class="addr">${esc(addr)}</div>
+          <div class="meta">
+            <span class="chip">${km(s.dist)}</span>
+            ${best ? `<span class="chip best">Günstigste</span>` : ""}
+            ${s.isOpen ? "" : `<span class="chip closed">Geschlossen</span>`}
+          </div>
+        </div>
+        <div class="right">
+          <div class="price">${priceHtml(s[fuel])}</div>
+          <div class="delta">${best ? "" : diff > 0 ? `+${diff} ct` : diff < 0 ? `${diff} ct` : "gleicher Preis"}</div>
+          <div class="go">Route starten ›</div>
+        </div>
+      </a></li>`;
+    }).join("") + "</ul>";
+
+    const hiddenClosed = priced.filter((s) => !s.isOpen && s.dist <= radius).length;
+    $("hidden").innerHTML = state.showClosed
+      ? `<button class="link" data-act="closed">Nur geöffnete anzeigen</button>`
+      : hiddenClosed ? `${hiddenClosed} geschlossene ausgeblendet. <button class="link" data-act="closed">Anzeigen</button>` : "";
+  }
+
+  function renderBanner() {
+    const parts = [];
+    if (state.keyError) parts.push(`<div class="banner">Tankerkönig nimmt deinen Schlüssel nicht an („${esc(state.keyError)}“). Die Preise sind deshalb Beispielwerte. Neue Schlüssel müssen meist erst über den Link in der Bestätigungsmail freigeschaltet werden. <button data-act="key">Schlüssel prüfen</button></div>`);
+    else if (!apiKey()) parts.push(`<div class="banner">Demo Modus: Die Preise sind Beispielwerte. <button data-act="key">Kostenlosen Schlüssel eintragen</button> für echte Preise.</div>`);
+    if (state.stale) parts.push(`<div class="banner">Kein Netz. Du siehst die Preise von ${clock(state.fetchedAt)} Uhr, sie können inzwischen abweichen.</div>`);
+    $("banner").innerHTML = parts.join("");
+  }
+
+  /* ---------- Bedienung ---------- */
+
+  function bindSeg(id, key) {
+    const el = $(id);
+    const sync = () => el.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === state[key])));
+    el.addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      state[key] = b.dataset.v;
+      store.set(key, state[key]);
+      sync();
+      if (state.stations) render();
+    });
+    sync();
+  }
+  bindSeg("fuel", "fuel");
+  bindSeg("sort", "sort");
+
+  $("refresh").addEventListener("click", () => run());
+
+  document.addEventListener("click", (e) => {
+    const act = e.target.closest("[data-act]")?.dataset.act;
+    if (act === "retry") run();
+    if (act === "closed") { state.showClosed = !state.showClosed; render(); }
+    if (act === "key") openKey();
+  });
+
+  document.addEventListener("submit", async (e) => {
+    if (e.target.id !== "placeForm") return;
+    e.preventDefault();
+    const text = $("placeInput").value.trim();
+    if (!text) return;
+    showState(`<div class="pulse"></div><h2>Ort wird gesucht</h2>`);
+    try { run(await geocode(text)); }
+    catch { showLocationError({ code: 2 }); }
+  });
+
+  function openKey() { $("keyInput").value = store.get("key", ""); $("keyDlg").showModal(); }
+  $("keyBtn").addEventListener("click", openKey);
+  $("keyDlg").addEventListener("close", () => {
+    if ($("keyDlg").returnValue !== "save") return;
+    store.set("key", $("keyInput").value.trim());
+    state.fetchedAt = 0;
+    run();
+  });
+
+  // Zurück in die App nach dem Tanken oder einer Pause: automatisch neu suchen, wenn die Daten älter als 5 Minuten sind.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && state.stations && Date.now() - state.fetchedAt > 300000) run();
+  });
+
+  if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
+
+  run();
+})();
+</script>
+</body>
+</html>
